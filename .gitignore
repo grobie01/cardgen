@@ -2,3 +2,4 @@ my_env/
 .env
 zhaudio/
 flashcards.txt
+.DS_Store
