@@ -32,9 +32,9 @@ It's a bit annoying but if you want the to use the audio on mobile, the collecti
 This generates two types of flashcards:
 
 1. Type 1: English phrase front
-![Type 1: English phrase front](card0.png)
+![Type 1: English phrase front](imgs/card0.png)
 
 2. Type 2: Chinese audio front
-![Type 2: Chinese audio front](card1.png)\
+![Type 2: Chinese audio front](imgs/card1.png)
 
 Happy hunting!
