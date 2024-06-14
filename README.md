@@ -8,6 +8,7 @@ Set your OpenAI API key in .env
 
 ```bash
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
 Add phrases to the `phrases.txt` file in English or Chinese. File can be a mix of both. Phrases just need to be newline separated.
 
