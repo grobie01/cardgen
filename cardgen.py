@@ -3,9 +3,13 @@ import os
 import sys
 import json
 import random
+import argparse
 from openai import OpenAI
+from elevenlabs.client import ElevenLabs
+import elevenlabs
 
-client = OpenAI()
+oai_client = OpenAI()
+xi_client = ElevenLabs(api_key=os.getenv('XI_API_KEY'))
 
 prompt = """Translate the following English and Chinese phrases and provide the output in JSON format with "cards" as top level field and subfields "english", "hanzi", "pinyin":
       {"cards": [{
@@ -28,7 +32,7 @@ def proc_json(json_data):
     return tuples
 
 #create list of tuples from file
-def read_file_in_chunks(file_name, chunk_size=10):
+def read_file_in_chunks(file_name, is_test=False,chunk_size=10):
     chunks = []
     with open(file_name, 'r') as file:
         while True:
@@ -44,7 +48,7 @@ def read_file_in_chunks(file_name, chunk_size=10):
 
             #submit list of ten lines to openai chat api
             prepared_lines = '\n'.join(lines)
-            response = client.chat.completions.create(
+            response = oai_client.chat.completions.create(
                             model="gpt-4o",
                             response_format={ "type": "json_object" },
                             messages=[
@@ -58,6 +62,8 @@ def read_file_in_chunks(file_name, chunk_size=10):
             for tup in processed_json:
                 chunks.append(tup)
             print("Processed chunk...")
+            if is_test:
+                break
     return chunks
 
 def gen_audio_filename(english_phrase):
@@ -65,35 +71,63 @@ def gen_audio_filename(english_phrase):
     english_phrase = re.sub(r'[^\w\s]', '', english_phrase)
     return english_phrase.replace(" ", "_") + ".mp3"
 
-voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+oai_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+xi_voices = xi_client.voices.get_all().voices
 
-def gen_audio(input, filename):
-    response = client.audio.speech.create(
-        model="tts-1",
-        voice=random.choice(voices),
-        input=input,
-    )
-    if not os.path.exists('zhaudio'):
-        os.makedirs('zhaudio')
-    response.stream_to_file(f"zhaudio/{filename}")
+def gen_audio(input, filename, use_eleven):
+    if use_eleven:
+        v = random.choice(xi_voices)
+        audio = xi_client.generate(
+            text=input,
+            voice=v.voice_id,
+            model="eleven_multilingual_v2"
+        )
+        elevenlabs.save(audio, f"zhaudio/{filename}")
+    else:
+        response = oai_client.audio.speech.create(
+            model="tts-1",
+            voice=random.choice(oai_voices),
+            input=input,
+        )
+        if not os.path.exists('zhaudio'):
+            os.makedirs('zhaudio')
+        response.stream_to_file(f"zhaudio/{filename}")
 
-def gen_flashcards(tuples, filename="flashcards.txt"):
+def gen_flashcards(tuples, skip_audio=False, filename="flashcards.txt", use_eleven=False):
     with open(filename, 'w') as f:
-        for english, hanzi, pinyin in tuples:
-            audio_filename = gen_audio_filename(english)
-            gen_audio(hanzi, audio_filename)
-            print(f"Generated audio file: {audio_filename}")
-            f.write(f"{english};{hanzi} <br> {pinyin} <br> [sound:{audio_filename}]\n")
+        chunk_size = 5
+        for i in range(0, len(tuples), chunk_size):
+            for english, hanzi, pinyin in tuples[i:i+chunk_size]:
+                audio_filename = gen_audio_filename(english)
+                if not skip_audio:
+                    gen_audio(hanzi, audio_filename, use_eleven)
+                    print(f"Generated audio file: {audio_filename}")
+                f.write(f"{english};{hanzi} <br> {pinyin} <br> [sound:{audio_filename}]\n")
 
-        for english, hanzi, pinyin in tuples:
-            audio_filename = gen_audio_filename(english)
-            f.write(f"[sound:{audio_filename}];{hanzi} <br> {pinyin} <br> {english}\n")
+            for english, hanzi, pinyin in tuples[i:i+chunk_size]:
+                audio_filename = gen_audio_filename(english)
+                f.write(f"[sound:{audio_filename}];{hanzi} <br> {pinyin} <br> {english}\n")
 
 
-def run(filename="phrases.txt"):
-    tuples = read_file_in_chunks(filename)
-    gen_flashcards(tuples)
+
+def parse_args():
+    # Create the parser
+    parser = argparse.ArgumentParser(description='Generate Anki flashcards for learning Chinese.')
+
+    # Add arguments
+    parser.add_argument('--test', action='store_true', help='Run only with first ten lines from the input file.')
+    parser.add_argument('--filename', type=str, default="phrases.txt", help='Name of the input file.')
+    parser.add_argument('--skip_audio', action='store_true', help='Skip generating audio files.')
+    parser.add_argument('--eleven', action='store_true', help='Use elevenlabs for generating audio.')
+
+    # Parse the arguments
+    return parser.parse_args()
+
+
+def run(args):
+    tuples = read_file_in_chunks(args.filename, args.test)
+    gen_flashcards(tuples, args.skip_audio, use_eleven=args.eleven)
 
 if __name__ == "__main__":
-    filename = sys.argv[1] if len(sys.argv) > 1 else "phrases.txt"
-    run(filename)
+    args = parse_args()
+    run(args)

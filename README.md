@@ -17,11 +17,17 @@ To run:
 ```bash
 python cardgen.py
 ```
-You can additionally specificy a particular input file to use as a positional argument.
+You can additionally specificy a particular input file using the `--filename` flag.
 
 ```bash
-python cardgen.py my_phrases.txt
+python cardgen.py --filename my_phrases.txt
 ```
+
+If you wish to use elevenlabs to generate audio, you will need to set the `XI_API_KEY` environment variable.
+
+To run with elevenlabs, use the `--eleven` flag.
+
+## Anki
 
 To use in Anki, click Import File and select `flashcards.txt`.
 
